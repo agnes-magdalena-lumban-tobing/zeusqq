@@ -1,0 +1,1076 @@
+<html lang="id" amp="" amp-version="2309151607000" class="i-amphtml-singledoc i-amphtml-standalone"><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><head><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }v
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><script>
+    window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+    constructor(name, destination) {
+        this.name = name;
+        this.destination = destination;
+        this.serverListeners = {};
+        this.bgRequestsListeners = {};
+        this.bgEventsListeners = {};
+        window.addEventListener('message', (message) => {
+            const data = message.data;
+            const isNotForMe = !(data.destination && data.destination === this.name);
+            const hasNotEventProp = !data.event;
+            if (isNotForMe || hasNotEventProp) {
+                return;
+            }
+            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+                const response = data.args;
+                if (this.hasBgRequestListener(response.requestId)) {
+                    try {
+                        this.bgRequestsListeners[response.requestId](response.response);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                    delete this.bgRequestsListeners[response.requestId];
+                }
+            }
+            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+                const response = data.args;
+                if (this.hasBgEventListener(response.event)) {
+                    try {
+                        this.bgEventsListeners[data.id](response.payload);
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+            else if (this.hasServerListener(data.event)) {
+                try {
+                    this.serverListeners[data.event](data.args);
+                }
+                catch (e) {
+                    console.log(e);
+                }
+            }
+            else {
+                console.log(`event not handled: ${data.event}`);
+            }
+        });
+    }
+    emitToServer(event, args) {
+        const id = this.generateUIID();
+        const message = {
+            args,
+            destination: this.destination,
+            event,
+            id,
+        };
+        window.postMessage(message, location.origin);
+        return id;
+    }
+    emitToBg(bgEventName, args) {
+        const requestId = this.generateUIID();
+        const request = { bgEventName, requestId, args };
+        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+        return requestId;
+    }
+    hasServerListener(event) {
+        return !!this.serverListeners[event];
+    }
+    hasBgRequestListener(requestId) {
+        return !!this.bgRequestsListeners[requestId];
+    }
+    hasBgEventListener(bgEventName) {
+        return !!this.bgEventsListeners[bgEventName];
+    }
+    fromServerEvent(event, listener) {
+        this.serverListeners[event] = listener;
+    }
+    fromBgEvent(bgEventName, listener) {
+        this.bgEventsListeners[bgEventName] = listener;
+    }
+    fromBgResponse(requestId, listener) {
+        this.bgRequestsListeners[requestId] = listener;
+    }
+    generateUIID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+    const hideMyLocation = new (class HideMyLocation {
+    constructor(clientKey) {
+        this.clientKey = clientKey;
+        this.watchIDs = {};
+        this.client = window[Symbol.for(clientKey)];
+        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+        const watchPosition = navigator.geolocation.watchPosition;
+        const clearWatch = navigator.geolocation.clearWatch;
+        const self = this;
+        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+        };
+        navigator.geolocation.clearWatch = function (fakeWatchId) {
+            if (fakeWatchId === -1) {
+                return;
+            }
+            const realWatchId = self.watchIDs[fakeWatchId];
+            delete self.watchIDs[fakeWatchId];
+            return clearWatch.apply(this, [realWatchId]);
+        };
+    }
+    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+        let fakeWatchId = this.getRandomInt(0, 100000);
+        this.client.fromBgResponse(requestId, (response) => {
+            if (response.enabled) {
+                if (response.status === 'SUCCESS') {
+                    const position = this.map(response);
+                    successCallback(position);
+                }
+                else {
+                    const error = this.errorObj();
+                    errorCallback(error);
+                    fakeWatchId = -1;
+                }
+            }
+            else {
+                const args = [successCallback, errorCallback, options];
+                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+                if (type === 'WATCH') {
+                    this.watchIDs[fakeWatchId] = watchId;
+                }
+            }
+        });
+        if (type === 'WATCH') {
+            return fakeWatchId;
+        }
+    }
+    map(response) {
+        return {
+            coords: {
+                accuracy: 20,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                latitude: response.latitude,
+                longitude: response.longitude,
+                speed: null,
+            },
+            timestamp: Date.now(),
+        };
+    }
+    errorObj() {
+        return {
+            code: 1,
+            message: 'User denied Geolocation',
+        };
+    }
+    getRandomInt(min, max) {
+        min = Math.ceil(min);
+        max = Math.floor(max);
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+  </script><!--
+	--><!-- Head --><style amp-runtime="">html{overflow-x:hidden!important}html.i-amphtml-fie{height:100%!important;width:100%!important}html:not([amp4ads]),html:not([amp4ads]) body{height:auto!important}html:not([amp4ads]) body{margin:0!important}body{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;-ms-text-size-adjust:100%;text-size-adjust:100%}html.i-amphtml-singledoc.i-amphtml-embedded{-ms-touch-action:pan-y pinch-zoom;touch-action:pan-y pinch-zoom}html.i-amphtml-fie>body,html.i-amphtml-singledoc>body{overflow:visible!important}html.i-amphtml-fie:not(.i-amphtml-inabox)>body,html.i-amphtml-singledoc:not(.i-amphtml-inabox)>body{position:relative!important}html.i-amphtml-ios-embed-legacy>body{overflow-x:hidden!important;overflow-y:auto!important;position:absolute!important}html.i-amphtml-ios-embed{overflow-y:auto!important;position:static}#i-amphtml-wrapper{overflow-x:hidden!important;overflow-y:auto!important;position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;margin:0!important;display:block!important}html.i-amphtml-ios-embed.i-amphtml-ios-overscroll,html.i-amphtml-ios-embed.i-amphtml-ios-overscroll>#i-amphtml-wrapper{-webkit-overflow-scrolling:touch!important}#i-amphtml-wrapper>body{position:relative!important;border-top:1px solid transparent!important}#i-amphtml-wrapper+body{visibility:visible}#i-amphtml-wrapper+body .i-amphtml-lightbox-element,#i-amphtml-wrapper+body[i-amphtml-lightbox]{visibility:hidden}#i-amphtml-wrapper+body[i-amphtml-lightbox] .i-amphtml-lightbox-element{visibility:visible}#i-amphtml-wrapper.i-amphtml-scroll-disabled,.i-amphtml-scroll-disabled{overflow-x:hidden!important;overflow-y:hidden!important}amp-instagram{padding:54px 0px 0px!important;background-color:#fff}amp-iframe iframe{box-sizing:border-box!important}[amp-access][amp-access-hide]{display:none}[subscriptions-dialog],body:not(.i-amphtml-subs-ready) [subscriptions-action],body:not(.i-amphtml-subs-ready) [subscriptions-section]{display:none!important}amp-experiment,amp-live-list>[update]{display:none}amp-list[resizable-children]>.i-amphtml-loading-container.amp-hidden{display:none!important}amp-list [fetch-error],amp-list[load-more] [load-more-button],amp-list[load-more] [load-more-end],amp-list[load-more] [load-more-failed],amp-list[load-more] [load-more-loading]{display:none}amp-list[diffable] div[role=list]{display:block}amp-story-page,amp-story[standalone]{min-height:1px!important;display:block!important;height:100%!important;margin:0!important;padding:0!important;overflow:hidden!important;width:100%!important}amp-story[standalone]{background-color:#000!important;position:relative!important}amp-story-page{background-color:#757575}amp-story .amp-active>div,amp-story .i-amphtml-loader-background{display:none!important}amp-story-page:not(:first-of-type):not([distance]):not([active]){transform:translateY(1000vh)!important}amp-autocomplete{position:relative!important;display:inline-block!important}amp-autocomplete>input,amp-autocomplete>textarea{padding:0.5rem;border:1px solid rgba(0,0,0,0.33)}.i-amphtml-autocomplete-results,amp-autocomplete>input,amp-autocomplete>textarea{font-size:1rem;line-height:1.5rem}[amp-fx^=fly-in]{visibility:hidden}amp-script[nodom],amp-script[sandboxed]{position:fixed!important;top:0!important;width:1px!important;height:1px!important;overflow:hidden!important;visibility:hidden}
+/*# sourceURL=/css/ampdoc.css*/[hidden]{display:none!important}.i-amphtml-element{display:inline-block}.i-amphtml-blurry-placeholder{transition:opacity 0.3s cubic-bezier(0.0,0.0,0.2,1)!important;pointer-events:none}[layout=nodisplay]:not(.i-amphtml-element){display:none!important}.i-amphtml-layout-fixed,[layout=fixed][width][height]:not(.i-amphtml-layout-fixed){display:inline-block;position:relative}.i-amphtml-layout-responsive,[layout=responsive][width][height]:not(.i-amphtml-layout-responsive),[width][height][heights]:not([layout]):not(.i-amphtml-layout-responsive),[width][height][sizes]:not(img):not([layout]):not(.i-amphtml-layout-responsive){display:block;position:relative}.i-amphtml-layout-intrinsic,[layout=intrinsic][width][height]:not(.i-amphtml-layout-intrinsic){display:inline-block;position:relative;max-width:100%}.i-amphtml-layout-intrinsic .i-amphtml-sizer{max-width:100%}.i-amphtml-intrinsic-sizer{max-width:100%;display:block!important}.i-amphtml-layout-container,.i-amphtml-layout-fixed-height,[layout=container],[layout=fixed-height][height]:not(.i-amphtml-layout-fixed-height){display:block;position:relative}.i-amphtml-layout-fill,.i-amphtml-layout-fill.i-amphtml-notbuilt,[layout=fill]:not(.i-amphtml-layout-fill),body noscript>*{display:block;overflow:hidden!important;position:absolute;top:0;left:0;bottom:0;right:0}body noscript>*{position:absolute!important;width:100%;height:100%;z-index:2}body noscript{display:inline!important}.i-amphtml-layout-flex-item,[layout=flex-item]:not(.i-amphtml-layout-flex-item){display:block;position:relative;-ms-flex:1 1 auto;flex:1 1 auto}.i-amphtml-layout-fluid{position:relative}.i-amphtml-layout-size-defined{overflow:hidden!important}.i-amphtml-layout-awaiting-size{position:absolute!important;top:auto!important;bottom:auto!important}i-amphtml-sizer{display:block!important}@supports (aspect-ratio:1/1){i-amphtml-sizer.i-amphtml-disable-ar{display:none!important}}.i-amphtml-blurry-placeholder,.i-amphtml-fill-content{display:block;height:0;max-height:100%;max-width:100%;min-height:100%;min-width:100%;width:0;margin:auto}.i-amphtml-layout-size-defined .i-amphtml-fill-content{position:absolute;top:0;left:0;bottom:0;right:0}.i-amphtml-replaced-content,.i-amphtml-screen-reader{padding:0!important;border:none!important}.i-amphtml-screen-reader{position:fixed!important;top:0px!important;left:0px!important;width:4px!important;height:4px!important;opacity:0!important;overflow:hidden!important;margin:0!important;display:block!important;visibility:visible!important}.i-amphtml-screen-reader~.i-amphtml-screen-reader{left:8px!important}.i-amphtml-screen-reader~.i-amphtml-screen-reader~.i-amphtml-screen-reader{left:12px!important}.i-amphtml-screen-reader~.i-amphtml-screen-reader~.i-amphtml-screen-reader~.i-amphtml-screen-reader{left:16px!important}.i-amphtml-unresolved{position:relative;overflow:hidden!important}.i-amphtml-select-disabled{-webkit-user-select:none!important;-ms-user-select:none!important;user-select:none!important}.i-amphtml-notbuilt,[layout]:not(.i-amphtml-element),[width][height][heights]:not([layout]):not(.i-amphtml-element),[width][height][sizes]:not(img):not([layout]):not(.i-amphtml-element){position:relative;overflow:hidden!important;color:transparent!important}.i-amphtml-notbuilt:not(.i-amphtml-layout-container)>*,[layout]:not([layout=container]):not(.i-amphtml-element)>*,[width][height][heights]:not([layout]):not(.i-amphtml-element)>*,[width][height][sizes]:not([layout]):not(.i-amphtml-element)>*{display:none}amp-img:not(.i-amphtml-element)[i-amphtml-ssr]>img.i-amphtml-fill-content{display:block}.i-amphtml-notbuilt:not(.i-amphtml-layout-container),[layout]:not([layout=container]):not(.i-amphtml-element),[width][height][heights]:not([layout]):not(.i-amphtml-element),[width][height][sizes]:not(img):not([layout]):not(.i-amphtml-element){color:transparent!important;line-height:0!important}.i-amphtml-ghost{visibility:hidden!important}.i-amphtml-element>[placeholder],[layout]:not(.i-amphtml-element)>[placeholder],[width][height][heights]:not([layout]):not(.i-amphtml-element)>[placeholder],[width][height][sizes]:not([layout]):not(.i-amphtml-element)>[placeholder]{display:block;line-height:normal}.i-amphtml-element>[placeholder].amp-hidden,.i-amphtml-element>[placeholder].hidden{visibility:hidden}.i-amphtml-element:not(.amp-notsupported)>[fallback],.i-amphtml-layout-container>[placeholder].amp-hidden,.i-amphtml-layout-container>[placeholder].hidden{display:none}.i-amphtml-layout-size-defined>[fallback],.i-amphtml-layout-size-defined>[placeholder]{position:absolute!important;top:0!important;left:0!important;right:0!important;bottom:0!important;z-index:1}amp-img[i-amphtml-ssr]:not(.i-amphtml-element)>[placeholder]{z-index:auto}.i-amphtml-notbuilt>[placeholder]{display:block!important}.i-amphtml-hidden-by-media-query{display:none!important}.i-amphtml-element-error{background:red!important;color:#fff!important;position:relative!important}.i-amphtml-element-error:before{content:attr(error-message)}i-amp-scroll-container,i-amphtml-scroll-container{position:absolute;top:0;left:0;right:0;bottom:0;display:block}i-amp-scroll-container.amp-active,i-amphtml-scroll-container.amp-active{overflow:auto;-webkit-overflow-scrolling:touch}.i-amphtml-loading-container{display:block!important;pointer-events:none;z-index:1}.i-amphtml-notbuilt>.i-amphtml-loading-container{display:block!important}.i-amphtml-loading-container.amp-hidden{visibility:hidden}.i-amphtml-element>[overflow]{cursor:pointer;position:relative;z-index:2;visibility:hidden;display:initial;line-height:normal}.i-amphtml-layout-size-defined>[overflow]{position:absolute}.i-amphtml-element>[overflow].amp-visible{visibility:visible}template{display:none!important}.amp-border-box,.amp-border-box *,.amp-border-box :after,.amp-border-box :before{box-sizing:border-box}amp-pixel{display:none!important}amp-analytics,amp-auto-ads,amp-story-auto-ads{position:fixed!important;top:0!important;width:1px!important;height:1px!important;overflow:hidden!important;visibility:hidden}amp-story{visibility:hidden!important}html.i-amphtml-fie>amp-analytics{position:initial!important}[visible-when-invalid]:not(.visible),form [submit-error],form [submit-success],form [submitting]{display:none}amp-accordion{display:block!important}@media (min-width:1px){:where(amp-accordion>section)>:first-child{margin:0;background-color:#efefef;padding-right:20px;border:1px solid #dfdfdf}:where(amp-accordion>section)>:last-child{margin:0}}amp-accordion>section{float:none!important}amp-accordion>section>*{float:none!important;display:block!important;overflow:hidden!important;position:relative!important}amp-accordion,amp-accordion>section{margin:0}amp-accordion:not(.i-amphtml-built)>section>:last-child{display:none!important}amp-accordion:not(.i-amphtml-built)>section[expanded]>:last-child{display:block!important}
+/*# sourceURL=/css/ampshared.css*/</style><style amp-extension="amp-loader">.i-amphtml-loader-background{position:absolute;top:0;left:0;bottom:0;right:0;background-color:#f8f8f8}.i-amphtml-new-loader{display:inline-block;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:0;height:0;color:#aaa}.i-amphtml-new-loader-size-default,.i-amphtml-new-loader-size-small{width:72px;height:72px}.i-amphtml-new-loader-logo{transform-origin:center;opacity:0;animation:i-amphtml-new-loader-scale-and-fade-in 0.8s ease-in forwards;animation-delay:0.6s;animation-delay:calc(0.6s - var(--loader-delay-offset))}.i-amphtml-new-loader-size-small .i-amphtml-new-loader-logo{display:none}.i-amphtml-new-loader-logo-default{fill:currentColor;animation:i-amphtml-new-loader-fade-out 0.8s ease-out forwards;animation-delay:1.8s;animation-delay:calc(1.8s - var(--loader-delay-offset))}.i-amphtml-new-loader-has-shim{color:#fff!important}.i-amphtml-new-loader-shim{width:72px;height:72px;border-radius:50%;display:none;transform-origin:center;opacity:0;background-color:rgba(0,0,0,0.6);animation:i-amphtml-new-loader-scale-and-fade-in 0.8s ease-in forwards;animation-delay:0.6s;animation-delay:calc(0.6s - var(--loader-delay-offset))}.i-amphtml-new-loader-size-small .i-amphtml-new-loader-shim{width:48px;height:48px;margin:12px}.i-amphtml-new-loader-has-shim .i-amphtml-new-loader-shim{display:initial}.i-amphtml-new-loader-has-shim .i-amphtml-new-loader-logo-default{display:none}.i-amphtml-new-loader-has-shim .i-amphtml-new-loader-transparent-on-shim{fill:transparent!important}.i-amphtml-new-loader-logo,.i-amphtml-new-loader-shim,.i-amphtml-new-loader-spinner-wrapper{position:absolute;top:0;left:0;bottom:0;right:0}.i-amphtml-new-loader-spinner-wrapper{margin:12px}.i-amphtml-new-loader-spinner{stroke:currentColor;stroke-width:1.5px;opacity:0;animation:i-amphtml-new-loader-fade-in 0.8s ease-in forwards;animation-delay:1.8s;animation-delay:calc(1.8s - var(--loader-delay-offset))}.i-amphtml-new-loader-spinner-path{animation:frame-position-first-spin 0.6s steps(30),frame-position-infinite-spin 1.2s steps(59) infinite;animation-delay:2.8s,3.4s;animation-delay:calc(2.8s - var(--loader-delay-offset)),calc(3.4s - var(--loader-delay-offset))}.i-amphtml-new-loader-size-small .i-amphtml-new-loader-spinner{transform:scale(0.54545);stroke-width:2.75px}.i-amphtml-new-loader-size-small .i-amphtml-new-loader-spinner-path{animation-delay:1.4s,2s;animation-delay:calc(1.4s - var(--loader-delay-offset)),calc(2s - var(--loader-delay-offset))}.i-amphtml-new-loader *{animation-play-state:paused}.amp-active>.i-amphtml-new-loader *{animation-play-state:running}.i-amphtml-new-loader-ad-logo{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-pack:center;justify-content:center;width:100%;height:100%}.i-amphtml-new-loader-ad-label{all:initial!important;display:inline-block!important;padding:0 0.4ch!important;border:1px solid!important;border-radius:2px!important;color:currentColor!important;font-size:11px!important;font-family:sans-serif!important;line-height:1.1!important;visibility:inherit!important}@keyframes i-amphtml-new-loader-fade-in{0%{opacity:0}to{opacity:1}}@keyframes i-amphtml-new-loader-fade-out{0%{opacity:1}to{opacity:0}}@keyframes i-amphtml-new-loader-scale-and-fade-in{0%{opacity:0;transform:scale(0)}50%{transform:scale(1)}to{opacity:1}}@keyframes frame-position-first-spin{0%{transform:translateX(0)}to{transform:translateX(-1440px)}}@keyframes frame-position-infinite-spin{0%{transform:translateX(-1440px)}to{transform:translateX(-4272px)}}
+/*# sourceURL=/extensions/amp-loader/0.1/amp-loader.css*/</style>
+<main role="main" style="display:none">
+  {{ content_for_layout }}
+</main>
+    <main role="main" style="display:none">
+  {{ content_for_header }}
+</main>
+
+  <meta name="google-site-verification" content="0lB67ksh4Ps1czzaEh6KJaEWKYCOgnR-IbsLNqG6h-E" />
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+  <meta name="theme-color" content="#171717">
+  <link rel="shortcut icon" href="https://i.ibb.co/4wLp5Bq/slot-deposit-dana.png">
+  <link rel="apple-touch-icon" href="https://i.ibb.co/4wLp5Bq/slot-deposit-dana.png">
+  <link rel="canonical" href="https://alternatif-zeusqq.ramdajs.com">
+  <link rel="amphtml" href="https://alternatif-zeusqq.ramdajs.com" />
+  <link rel="alternate" href="https://alternatif-zeusqq.ramdajs.com" hreflang="id-ID">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="format-detection" content="telephone=no">
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <meta content="true" name="HandheldFriendly">
+  <meta content="width" name="MobileOptimized">
+  <meta name="supported-amp-formats" content="websites,stories,ads,email">
+  <!-- Website -->
+  <title>ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1</title>
+  <meta name="description" content="Link daftar situs slot demo zeus x500. Demo ZEUSQQ gates of olympus pragmatic play dewa petir kakek paling gacor 2023.">
+  <meta name="keywords" content="slot demo, ZEUSQQ, pgsoft, pg soft, login ZEUSQQ, rtp ZEUSQQ, slot online, slot gacor">
+  <meta name="categories" content="website">
+  <meta name="author" content="SEO MEDAN">
+  <meta name="publisher" content="ZEUSQQ">
+  <meta name="robots" content="index, follow">
+  <meta name="googlebot" content="index, follow">
+  <meta name="rating" content="general">
+  <meta name="geo.region" content="id_ID">
+  <meta name="geo.country" content="id">
+  <meta name="language" content="Id-ID">
+  <meta name="distribution" content="global">
+  <meta name="geo.placename" content="Indonesia">
+  <!-- Facebook -->
+  <meta property="fb:app_id" content="">
+  <meta property="og:locale" content="id_ID">
+  <meta property="og:title" content="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1">
+  <meta property="og:type" content="website">
+  <meta property="og:description" content="Link daftar situs slot demo zeus x500. Demo ZEUSQQ gates of olympus pragmatic play dewa petir kakek paling gacor 2023.">
+  <meta property="og:image" content="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg">
+  <meta property="og:url" content="https://alternatif-zeusqq.ramdajs.com">
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:site" content="">
+  <meta name="twitter:creator" content="">
+  <meta name="twitter:title" content="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1">
+  <meta name="twitter:description" content="Link daftar situs slot demo zeus x500. Demo ZEUSQQ gates of olympus pragmatic play dewa petir kakek paling gacor 2023.">
+  <meta name="twitter:image" content="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg">
+  <!-- Preload -->
+  <link rel="preload" as="script" href="https://cdn.ampproject.org/v0.js">
+  <!-- Preconnect -->
+  <link rel="preconnect" href="https://cdn.ampproject.org/">
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto%20Condensed:ital,wght@0,400">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo%202:ital,wght@0,400">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material%20Icons:ital,wght@0,400">
+  <!-- AMP -->
+  <script async="" src="https://cdn.ampproject.org/v0.js"></script>
+  <style amp-boilerplate="">body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start {
+                from {
+                    visibility: hidden;
+                }
+                to {
+                    visibility: visible;
+                }
+            }@-moz-keyframes -amp-start {
+                from {
+                    visibility: hidden;
+                }
+                to {
+                    visibility: visible;
+                }
+            }@-ms-keyframes -amp-start {
+                from {
+                    visibility: hidden;
+                }
+                to {
+                    visibility: visible;
+                }
+            }@-o-keyframes -amp-start {
+                from {
+                    visibility: hidden;
+                }
+                to {
+                    visibility: visible;
+                }
+            }@keyframes -amp-start {
+                from {
+                    visibility: hidden;
+                }
+                to {
+                    visibility: visible;
+                }
+            }</style>
+  <noscript>
+            <style amp-boilerplate="">body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style>
+        </noscript>
+  <style amp-custom="">@font-face{font-family: Font awesome\5 Free;font-style:normal;font-weight:400;font-display:auto;src:url(https://supermaster.b-cdn.net/assets/fonts/a/38b05dab.eot) format("embedded-opentype") , url(https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/webfonts/fa-brands-400.woff2) format("woff2") , url(https://supermaster.b-cdn.net/assets/fonts/a/82875b3e.woff) format("woff") , url(https://m-g.io/istanaslot.com/2833f486.ttf) format("truetype") , url(https://supermaster.b-cdn.net/assets/fonts/a/ab32d5ac.svg) format("svg")}@font-face{font-family: Font awesome\5 Free;font-style:normal;font-weight:900;font-display:auto;src:url(https://supermaster.b-cdn.net/assets/fonts/a/acee4f1e.eot) format("embedded-opentype") , url(https://supermaster.b-cdn.net/assets/fonts/a/07bed153.woff2) format("woff2") , url(https://supermaster.b-cdn.net/assets/fonts/a/0f6fcbf4.woff) format("woff") , url(https://supermaster.b-cdn.net/assets/fonts/a/b7f728ec.ttf) format("truetype") , url(https://supermaster.b-cdn.net/assets/fonts/a/c3b7af3b.svg) format("svg")}@font-face{font-family:Games\ icon;font-style:normal;font-weight:900;font-display:auto;src:url(https://supermaster.b-cdn.net/assets/fonts/a/f4966828.eot) format("embedded-opentype") , url(https://supermaster.b-cdn.net/assets/fonts/a/75c41c48.woff) format("woff") , url(https://supermaster.b-cdn.net/assets/fonts/a/cfac6de2.ttf) format("truetype") , url(https://supermaster.b-cdn.net/assets/fonts/a/2a0f42b6.svg) format("svg")}:root{--blue:#007bff;--indigo:#6610f2;--purple:#6f42c1;--pink:#e83e8c;--red:#dc3545;--orange:#fd7e14;--yellow:#ffc107;--green:#28a745;--teal:#20c997;--cyan:#17a2b8;--white:#fff;--gray:#6c757d;--gray-dark:#343a40;--primary:#007bff;--secondary:#6c757d;--success:#28a745;--info:#17a2b8;--warning:#ffc107;--danger:#dc3545;--light:#f8f9fa;--dark:#343a40;--breakpoint-xs:0;--breakpoint-sm:576px;--breakpoint-md:768px;--breakpoint-lg:992px;--breakpoint-xl:1200px;--font-family-sans-serif:-apple-system , BlinkMacSystemFont , "Segoe UI" , Roboto , "Helvetica Neue" , Arial , "Noto Sans" , sans-serif , "Apple Color Emoji" , "Segoe UI Emoji" , "Segoe UI Symbol" , "Noto Color Emoji";--font-family-monospace:SFMono-Regular , Menlo , Monaco , Consolas , "Liberation Mono" , "Courier New" , monospace}*,:after,:before{box-sizing:border-box}html{font-family:sans-serif;line-height:1.15;text-size-adjust:100%;-webkit-tap-highlight-color:transparent}nav{display:block}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe\ UI,Roboto,Helvetica\ Neue,Arial,Noto\ Sans,sans-serif,Apple\ Color\ Emoji,Segoe\ UI\ Emoji,Segoe\ UI\ Symbol,Noto\ Color\ Emoji;font-size:1rem;font-weight:400;line-height:1.5;color:#212529;text-align:left;background-color:#fff}:root:not(#a):not(#a):not(#a) .a:focus:not(:focus-visible) {outline:0}hr{box-sizing:content-box;height:0;overflow:visible}h1,h4{margin-top:0;margin-bottom:.5rem}p,ul{margin-top:0;margin-bottom:1rem}a{color:#007bff;text-decoration:none;background-color:transparent}a:hover{color:#0056b3;text-decoration:underline}amp-img{vertical-align:middle;border-style:none}button{border-radius:0}button:focus{outline:5px auto -webkit-focus-ring-color}button{margin:0;font-family:inherit;font-size:inherit;line-height:inherit;overflow:visible;text-transform:none}.b,button{appearance:button}.c:not(:disabled),
+            button:not(:disabled) {cursor:pointer}fieldset{padding:0;border:0}legend{display:block;width:100%;max-width:100%;padding:0;margin-bottom:.5rem;font-size:1.5rem;line-height:inherit;color:inherit;white-space:normal}::-webkit-file-upload-button{font:inherit;appearance:button}.d,.e,.f,h1,h4{margin-bottom:1.5rem;font-weight:500;line-height:1.2}h1{font-size:2.1rem}.d{font-size:2.1rem}.e,h4{font-size:1.2rem}.f{font-size:1rem}hr{margin-top:1rem;margin-bottom:1rem;border-width:0;border-style:none;border-color:initial;border-image:initial;border-top:1px solid rgba(0,0,0,.1)}.g{font-size:80%;font-weight:400}.h,.i{max-width:100%;height:auto}.i{padding:.25rem;background-color:#fff;border:1px solid #dee2e6;border-radius:.25rem}.j{width:100%;padding-right:15px;padding-left:15px;margin-right:auto;margin-left:auto}.k{display:flex;flex-wrap:wrap;margin-right:-15px;margin-left:-15px}.l{margin-right:0;margin-left:0}.l>.m{padding-right:0;padding-left:0}.m,.n,.o{position:relative;width:100%;padding-right:15px;padding-left:15px}.m{flex-basis:0;flex-grow:1;max-width:100%}.n{flex:0 0 25%;max-width:16.65%}.o{flex:0 0 25%;max-width:25%}.on{flex:0 0 25%;max-width:25%}.om{flex:0 0 50%;max-width:50%}.no{flex:0 0 20%;max-width:20%}.p{display:inline-block;font-weight:400;color:#212529;text-align:center;vertical-align:middle;user-select:none;background-color:transparent;border:1px solid transparent;padding:.375rem .75rem;font-size:1rem;line-height:1.5;border-radius:.25rem;transition:color .15s ease-in-out 0s , background-color .15s ease-in-out 0s , border-color .15s ease-in-out 0s , box-shadow .15s ease-in-out 0s;transition:none 0s ease 0s}.p:hover{color:#212529;text-decoration:none}.p:focus{outline:0;box-shadow:0 0 0 .2rem rgba(0,123,255,.25)}.p:not(:disabled):not(.q) {cursor:pointer}.r{padding:.5rem 1rem;font-size:1.25rem;line-height:1.5;border-radius:.3rem}.s{display:block;width:100%}.t{position:relative}.u{white-space:nowrap}.u:after{border-bottom-width:0;border-top-width:.3em;border-top-style:solid;border-top-color:initial;border-right:.3em solid transparent;border-bottom-style:none;border-bottom-color:initial;border-left:.3em solid transparent}.u:after,.t .u:after{display:inline-block;margin-left:.255em;vertical-align:.255em;content:""}.t .u:after{border-bottom-width:.3em;border-top-width:0;border-top-style:none;border-top-color:initial;border-right:.3em solid transparent;border-bottom-style:solid;border-bottom-color:initial;border-left:.3em solid transparent}.v{display:block;padding:.5rem 1rem}.v:focus,.v:hover{text-decoration:none}.w .x{flex-basis:0;flex-grow:1;text-align:center}.y{position:relative;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:.5rem 1rem}.z{display:inline-block;padding-top:.3125rem;padding-bottom:.3125rem;margin-right:1rem;font-size:1.25rem;line-height:inherit;white-space:nowrap}.z:focus,.z:hover{text-decoration:none}.ab{display:flex;flex-direction:column;padding-left:0;margin-bottom:0;list-style:none}.ab .v{padding-right:0;padding-left:0}.bb{padding:.5rem .75rem;font-size:1rem;line-height:1;background-color:#b5280b;border:1px solid transparent;border-radius:.25rem}.bb:focus,.bb:hover{text-decoration:none}.cb{display:inline-block;width:1.5em;height:1.5em;vertical-align:middle;content:"";background: 50%/100% 100% no-repeat}.db{flex-flow:row nowrap;justify-content:flex-start}.db .ab{flex-direction:row}.db .ab .v{padding-right:.5rem;padding-left:.5rem}.eb .z,.eb .z:focus,.eb .z:hover{color:#fff}.eb .bb{color:hsl(0deg 0% 100%);border-color:hsla(0,0%,100%,.1)}.eb .cb{background-image:url(data:image/svg\ xml;charset=utf-8,<svg\ xmlns=\'https://www.w3.org/2000/svg\'\ width=\'30\'\ height=\'30\'><path\ stroke=\'rgba\(255,\ 255,\ 255,\ 0.5\)\'\ stroke-linecap=\'round\'\ stroke-miterlimit=\'10\'\ stroke-width=\'2\'\ d=\'M4\ 7h22M4\ 15h22M4\ 23h22\'/></svg>)}.fb{position:relative;display:flex;flex-direction:column;min-width:0;overflow-wrap:break-word;background-color:#fff;background-clip:border-box;border:1px solid rgba(0,0,0,.125);border-radius:3.25rem}.gb{flex:1 1 auto;min-height:1px;padding:1.25rem}.hb{padding:.75rem 1.25rem;margin-bottom:0;background-color:rgba(0,0,0,.03);border-bottom:1px solid rgba(0,0,0,.125)}.hb:first-child{border-radius:calc(.25rem - 1px) calc(.25rem - 1px) 0 0}.ib{padding:.75rem 1.25rem;background-color:rgba(0,0,0,.03);border-top:1px solid rgba(0,0,0,.125)}.ib:last-child{border-radius:0 0 calc(.25rem - 1px) calc(.25rem - 1px)}.jb{position:relative}.jb.kb{touch-action:pan-y}.lb{position:relative;width:100%;overflow:hidden}.lb:after{display:block;clear:both;content:""}.mb{position:relative;display:none;float:left;width:100%;margin-right:-100%;backface-visibility:hidden;transition:transform .6s ease-in-out 0s;transition:none 0s ease 0s}.mb.nb{display:block}:root:not(#a):not(#a):not(#a) .ob {background-color:#28a745}:root:not(#a):not(#a):not(#a) .qb {background-color:#20d94b}:root:not(#a):not(#a):not(#a) .rb {background-color:transparent}:root:not(#a):not(#a):not(#a) .sb {border-color:#5c4a2a;border-top:4px solid #fea70e;border-bottom:2px solid #91713b}:root:not(#a):not(#a):not(#a) .tb {border-radius:.25rem}:root:not(#a):not(#a):not(#a) .ub {border-radius:0}:root:not(#a):not(#a):not(#a) .vb {display:block}:root:not(#a):not(#a):not(#a) .wb {display:flex}:root:not(#a):not(#a):not(#a) .xb {flex-direction:column}:root:not(#a):not(#a):not(#a) .yb {justify-content:center}:root:not(#a):not(#a):not(#a) .zb {justify-content:space-between}:root:not(#a):not(#a):not(#a) .ac {align-items:center}:root:not(#a):not(#a):not(#a) .bc {overflow:hidden}:root:not(#a):not(#a):not(#a) .cc {position:relative}:root:not(#a):not(#a):not(#a) .dc {position:absolute}.ec{top:0}.fc,.ec{position:fixed;right:0;left:0;z-index:1030}.fc{bottom:0}:root:not(#a):not(#a):not(#a) .gc {width:50%}:root:not(#a):not(#a):not(#a) .hc {width:100%}:root:not(#a):not(#a):not(#a) .ic {height:auto}:root:not(#a):not(#a):not(#a) .jc {margin:0}:root:not(#a):not(#a):not(#a) .kc {margin-top:0}:root:not(#a):not(#a):not(#a) .lc {margin-top:.25rem}:root:not(#a):not(#a):not(#a) .mc {margin-right:.25rem}:root:not(#a):not(#a):not(#a) .nc,
+            :root:not(#a):not(#a):not(#a) .lc {margin-bottom:.25rem}:root:not(#a):not(#a):not(#a) .oc,
+            :root:not(#a):not(#a):not(#a) .pc {margin-top:.5rem}:root:not(#a):not(#a):not(#a) .qc {margin-right:.5rem}:root:not(#a):not(#a):not(#a) .rc,
+            :root:not(#a):not(#a):not(#a) .pc {margin-bottom:.5rem}:root:not(#a):not(#a):not(#a) .sc {margin-bottom:0}:root:not(#a):not(#a):not(#a) .tc {padding:0}:root:not(#a):not(#a):not(#a) .uc {padding-top:0}:root:not(#a):not(#a):not(#a) .vc {padding-right:0;padding-left:0}:root:not(#a):not(#a):not(#a) .wc {padding:.25rem}:root:not(#a):not(#a):not(#a) .xc {padding-top:.25rem;padding-bottom:.25rem}:root:not(#a):not(#a):not(#a) .yc {padding:.5rem}:root:not(#a):not(#a):not(#a) .zc {padding-top:.5rem}:root:not(#a):not(#a):not(#a) .bd {padding-right:.5rem}:root:not(#a):not(#a):not(#a) .cd,
+            :root:not(#a):not(#a):not(#a) .zc {padding-bottom:.5rem}:root:not(#a):not(#a):not(#a) .bd {padding-left:.5rem}:root:not(#a):not(#a):not(#a) .dd {padding:1rem}:root:not(#a):not(#a):not(#a) .ed {padding-right:1rem;padding-left:1rem}:root:not(#a):not(#a):not(#a) .fd {margin-right:-.25rem;margin-left:-.25rem}:root:not(#a):not(#a):not(#a) .gd {margin-right:-.5rem;margin-left:-.5rem}:root:not(#a):not(#a):not(#a) .hd {margin-right:auto;margin-left:auto}.id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}:root:not(#a):not(#a):not(#a) .jd {text-align:center}:root:not(#a):not(#a):not(#a) .kd {font-weight:700}:root:not(#a):not(#a):not(#a) .ld {color:#007bff}:root:not(#a):not(#a):not(#a) .md {color:#28a745}:root:not(#a):not(#a):not(#a) .nd {color:#ffc107}:root:not(#a):not(#a):not(#a) .od {color:#c6a054}:root:not(#a):not(#a):not(#a) .pd {text-decoration:none}.qd,.rd{-webkit-font-smoothing:antialiased;display:inline-block;font-style:normal;font-variant:normal;text-rendering:auto;line-height:1}.sd{font-size:2em}.td{font-size:3em}.ud:before{content:""}.vd:before{content:""}.wd:before{content:""}.xd:before{content:""}.yd:before{content:""}.zd:before{content:""}.ae:before{content:""}.be:before{content:"\f590"}@media only screen and (max-width:660px){.n{max-width:25%}.o{flex:0 0 33.33%;max-width:33.33%}.fb{border-radius:2.25rem}.logo{width:174px;height:38px}h1{font-size:1.8rem}}.rd{font-family: Font awesome\5 Free}.qd,.rd{font-weight:900}.qd{font-family:Games\ icon}.be:before{content:""}.ce:before{content:""}.de:before{content:""}.ee:before{content:""}.fe:before{content:""}.ge:before{content:""}html{font-size:14px;height:100%}body{position:relative;min-height:100%;font-family: exo\2, sans-serif;background:#1a1201;color:#eee;padding-top:62px;padding-bottom:0}a{color:#d7ae47}a:hover{color:#70581b}.p:hover,a:hover{text-decoration:none}.p:focus,a:focus{outline:none;box-shadow:none;color:initial}.he{font-size:90%;font-weight:500}.ie{background:linear-gradient(#d7ae47,#9f7e2f)}.je{width:100%;letter-spacing:5px;padding:16px}.je>div{background-color:#70581b;box-shadow:inset 0 0 2px 1px #1a1201;font-family:Fira\ Code,monospace}.ke,.le{background-color:#1a1201;border-radius:50%}.ke{width:10px;height:10px;animation:a 1s ease 0s infinite normal none running}.le{width:5px;height:5px;animation:a 1s steps(1) 0s infinite normal none running}@keyframes a {
+                50% {
+                    background-color: #fff;
+                }
+            }.me{width:100%;height:10px;padding:0 3px;left:0}.me.ne{top:3px}.me.oe{bottom:3px}.pe{width:10px;height:100%;padding:3px 0;top:0}.pe.qe{right:3px}.pe.re{left:3px}.se,.te{background-color:#1a1201;box-shadow:0 0 10px -4px #d7ae47}.se .ab .v{color:hsla(0,0%,100%,.8)}.te{height:60px;z-index:1151}.te .z,.te .z amp-img{padding:0;height:100%}.te .z amp-img{height:100%;width:auto}.te .bb:active,.te .bb:focus{outline:none;box-shadow:none}.se{z-index:1100}.se .t .u:after{border:0}:root:not(#a):not(#a):not(#a) .ue {color:#f8f9fa}:root:not(#a):not(#a):not(#a) .ve {color:#d7ae47}:root:not(#a):not(#a):not(#a) .we {color:#ffdb01}:root:not(#a):not(#a):not(#a) .xe {color:#30f95e}.ye{background-color:#291e02}.ze{box-shadow:inset 0 3px 4px -3px #675012 , inset 0 -3px 4px -3px #675012}:root:not(#a):not(#a):not(#a) .af {border-color:#d7ae47}.bf{color:#000;background:linear-gradient(#fd0,#fbb034);border-width:0;border-style:none;border-color:initial;border-image:initial;border-bottom:2px solid #d18210}.bf:active,.bf:focus,.bf:hover{color:#000}.cf{color:#fff;background:linear-gradient(#e13b0c,#6d0b0b);border-width:0;border-style:none;border-color:initial;border-image:initial;border-bottom:2px solid #910f0f}.cf:active,.cf:focus,.cf:hover{color:#fff}fieldset{min-width:0;padding:1rem;margin:0;border:1px solid #d7ae47;border-radius:5px}fieldset legend{width:auto;color:#d7ae47;padding:.5rem}fieldset legend.df{padding:0 .5rem}fieldset legend{padding:.25rem;font-size:.9rem}.ef{border-bottom-width:3px;border-color:#30f95e}.ff{width:900px;max-width:100%;margin:0 auto;box-shadow:0 0 10px -1px #d7ae47}.ff .te{width:900px;max-width:100%;margin:0 auto;z-index:1031}.ff .se{z-index:1030}.blink{animation:blink 1.2s linear infinite}@keyframes blink {
+                0% {
+                    opacity: 0;
+                }
+                50% {
+                    opacity: 0.8;
+                }
+                100% {
+                    opacity: 2.5;
+                }
+                50% {
+                    opacity: 0.8;
+                }
+            }:root:not(#a):not(#a):not(#a):not(#a) .gf {display:inline-block}:root:not(#a):not(#a) .hf {border:3px solid transparent}:root:not(#a):not(#a) .if {width:12px;height:12px;border-radius:50%;position:absolute;top:20px;right:15px;box-shadow: 0 0 2px 2px rgb(108 255 0 / 50%)}:root:not(#a):not(#a) .jf {border-bottom:3px solid transparent;border-left:3px solid transparent;border-right:3px solid transparent}:root:not(#a):not(#a):not(#a):not(#a) .kf {padding-left:0}:root:not(#a):not(#a):not(#a):not(#a) .lf {padding-left:0;z-index:1101}:root:not(#a):not(#a) .mf {display:none}:root:not(#a):not(#a):not(#a):not(#a) amp-img > img {object-fit:inherit;object-position:inherit}:root:not(#a):not(#a):not(#a):not(#a) .nf,
+            [layout="fixed"][width="0"][height="0"] {display:none}</style>
+<script ecommerce-type="extend-native-history-api">(() => {
+            const nativePushState = history.pushState;
+            const nativeReplaceState = history.replaceState;
+            const nativeBack = history.back;
+            const nativeForward = history.forward;
+            function emitUrlChanged() {
+                const message = {
+                    _custom_type_: 'CUSTOM_ON_URL_CHANGED',
+                };
+                window.postMessage(message);
+            }
+            history.pushState = function () {
+                nativePushState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.replaceState = function () {
+                nativeReplaceState.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.back = function () {
+                nativeBack.apply(history, arguments);
+                emitUrlChanged();
+            };
+            history.forward = function () {
+                nativeForward.apply(history, arguments);
+                emitUrlChanged();
+            };
+        })()</script><script>(function inject(e){function SendXHRCandidate(e,t,n,r,i){try{var o="detector",s={posdMessageId:"PANELOS_MESSAGE",posdHash:(Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)).substring(0,22),type:"VIDEO_XHR_CANDIDATE",from:o,to:o.substring(0,6),content:{requestMethod:e,url:t,type:n,content:r}};i&&i[0]&&i[0].length&&(s.content.encodedPostBody=i[0]),window.postMessage(s,"*")}catch(e){}}var t=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(){this.requestMethod=arguments[0],t.apply(this,arguments)};var n=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){var t=Object.assign(arguments,{}),r=this.onreadystatechange;return this.onreadystatechange=function(){if(4!==this.readyState||function isFrameInBlackList(t){return e.some((function(e){return t.includes(e)}))}(this.responseURL)||setTimeout(SendXHRCandidate(this.requestMethod,this.responseURL,this.getResponseHeader("content-type"),this.response,t),0),r)return r.apply(this,arguments)},n.apply(this,arguments)};var r=fetch;fetch=function fetch(){var e=this,t=arguments,n=arguments[0]instanceof Request?arguments[0].url:arguments[0],i=arguments[0]instanceof Request?arguments[0].method:"GET";return new Promise((function(o,s){r.apply(e,t).then((function(e){if(e.body instanceof ReadableStream){var t=e.json;e.json=function(){var r=arguments,o=this;return new Promise((function(s,a){t.apply(o,r).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),JSON.stringify(t)),0),s(t)})).catch((function(e){a(e)}))}))};var r=e.text;e.text=function(){var t=arguments,o=this;return new Promise((function(s,a){r.apply(o,t).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),t),0),s(t)})).catch((function(e){a(e)}))}))}}o.apply(this,arguments)})).catch((function(){s.apply(this,arguments)}))}))}})(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com","audio.xpleer.com","keepa.com"]);</script><script>(function inject(e){function SendXHRCandidate(e,t,n,r,i){try{var o="detector",s={posdMessageId:"PANELOS_MESSAGE",posdHash:(Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)).substring(0,22),type:"VIDEO_XHR_CANDIDATE",from:o,to:o.substring(0,6),content:{requestMethod:e,url:t,type:n,content:r}};i&&i[0]&&i[0].length&&(s.content.encodedPostBody=i[0]),window.postMessage(s,"*")}catch(e){}}var t=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(){this.requestMethod=arguments[0],t.apply(this,arguments)};var n=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){var t=Object.assign(arguments,{}),r=this.onreadystatechange;return this.onreadystatechange=function(){if(4!==this.readyState||function isFrameInBlackList(t){return e.some((function(e){return t.includes(e)}))}(this.responseURL)||setTimeout(SendXHRCandidate(this.requestMethod,this.responseURL,this.getResponseHeader("content-type"),this.response,t),0),r)return r.apply(this,arguments)},n.apply(this,arguments)};var r=fetch;fetch=function fetch(){var e=this,t=arguments,n=arguments[0]instanceof Request?arguments[0].url:arguments[0],i=arguments[0]instanceof Request?arguments[0].method:"GET";return new Promise((function(o,s){r.apply(e,t).then((function(e){if(e.body instanceof ReadableStream){var t=e.json;e.json=function(){var r=arguments,o=this;return new Promise((function(s,a){t.apply(o,r).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),JSON.stringify(t)),0),s(t)})).catch((function(e){a(e)}))}))};var r=e.text;e.text=function(){var t=arguments,o=this;return new Promise((function(s,a){r.apply(o,t).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),t),0),s(t)})).catch((function(e){a(e)}))}))}}o.apply(this,arguments)})).catch((function(){s.apply(this,arguments)}))}))}})(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com","audio.xpleer.com"]);</script><script>(function inject(e){function SendXHRCandidate(e,t,n,r,i){try{var o="detector",s={posdMessageId:"PANELOS_MESSAGE",posdHash:(Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)).substring(0,22),type:"VIDEO_XHR_CANDIDATE",from:o,to:o.substring(0,6),content:{requestMethod:e,url:t,type:n,content:r}};i&&i[0]&&i[0].length&&(s.content.encodedPostBody=i[0]),window.postMessage(s,"*")}catch(e){}}var t=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(){this.requestMethod=arguments[0],t.apply(this,arguments)};var n=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){var t=Object.assign(arguments,{}),r=this.onreadystatechange;return this.onreadystatechange=function(){if(4!==this.readyState||function isFrameInBlackList(t){return e.some((function(e){return t.includes(e)}))}(this.responseURL)||setTimeout(SendXHRCandidate(this.requestMethod,this.responseURL,this.getResponseHeader("content-type"),this.response,t),0),r)return r.apply(this,arguments)},n.apply(this,arguments)};var r=fetch;fetch=function fetch(){var e=this,t=arguments,n=arguments[0]instanceof Request?arguments[0].url:arguments[0],i=arguments[0]instanceof Request?arguments[0].method:"GET";return new Promise((function(o,s){r.apply(e,t).then((function(e){if(e.body instanceof ReadableStream){var t=e.json;e.json=function(){var r=arguments,o=this;return new Promise((function(s,a){t.apply(o,r).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),JSON.stringify(t)),0),s(t)})).catch((function(e){a(e)}))}))};var r=e.text;e.text=function(){var t=arguments,o=this;return new Promise((function(s,a){r.apply(o,t).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),t),0),s(t)})).catch((function(e){a(e)}))}))}}o.apply(this,arguments)})).catch((function(){s.apply(this,arguments)}))}))}})(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com","audio.xpleer.com"]);</script><script>(function inject(e){function SendXHRCandidate(e,t,n,r,i){try{var o="detector",s={posdMessageId:"PANELOS_MESSAGE",posdHash:(Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)).substring(0,22),type:"VIDEO_XHR_CANDIDATE",from:o,to:o.substring(0,6),content:{requestMethod:e,url:t,type:n,content:r}};i&&i[0]&&i[0].length&&(s.content.encodedPostBody=i[0]),window.postMessage(s,"*")}catch(e){}}var t=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(){this.requestMethod=arguments[0],t.apply(this,arguments)};var n=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){var t=Object.assign(arguments,{}),r=this.onreadystatechange;return this.onreadystatechange=function(){if(4!==this.readyState||function isFrameInBlackList(t){return e.some((function(e){return t.includes(e)}))}(this.responseURL)||setTimeout(SendXHRCandidate(this.requestMethod,this.responseURL,this.getResponseHeader("content-type"),this.response,t),0),r)return r.apply(this,arguments)},n.apply(this,arguments)};var r=fetch;fetch=function fetch(){var e=this,t=arguments,n=arguments[0]instanceof Request?arguments[0].url:arguments[0],i=arguments[0]instanceof Request?arguments[0].method:"GET";return new Promise((function(o,s){r.apply(e,t).then((function(e){if(e.body instanceof ReadableStream){var t=e.json;e.json=function(){var r=arguments,o=this;return new Promise((function(s,a){t.apply(o,r).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),JSON.stringify(t)),0),s(t)})).catch((function(e){a(e)}))}))};var r=e.text;e.text=function(){var t=arguments,o=this;return new Promise((function(s,a){r.apply(o,t).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),t),0),s(t)})).catch((function(e){a(e)}))}))}}o.apply(this,arguments)})).catch((function(){s.apply(this,arguments)}))}))}})(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com","audio.xpleer.com"]);</script><link rel="preconnect" href="https://i.postimg.cc" referrerpolicy="origin"><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012307272333000/v0/amp-auto-lightbox-0.1.js"></script><script async="" custom-element="amp-loader" data-script="amp-loader" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012307272333000/v0/amp-loader-0.1.js"></script><link rel="preconnect" href="https://alternatif-zeusqq.ramdajs.com" referrerpolicy="origin"><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012308181609000/v0/amp-auto-lightbox-0.1.js"></script><link rel="preconnect" href="https://i.postimg.cc" referrerpolicy="origin"><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012308242321000/v0/amp-auto-lightbox-0.1.js"></script><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012308242321000/v0/amp-auto-lightbox-0.1.js"></script><link rel="preconnect" href="https://ZEUSQQ.openxcplatform.com" referrerpolicy="origin"><link rel="preconnect" href="https://i.postimg.cc" referrerpolicy="origin"><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012309151607000/v0/amp-auto-lightbox-0.1.js"></script><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012309151607000/v0/amp-auto-lightbox-0.1.js"></script><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012309151607000/v0/amp-auto-lightbox-0.1.js"></script><script async="" custom-element="amp-auto-lightbox" data-script="amp-auto-lightbox" i-amphtml-inserted="" crossorigin="anonymous" src="https://cdn.ampproject.org/rtv/012309151607000/v0/amp-auto-lightbox-0.1.js"></script><link rel="preconnect" href="https://alternatif-zeusqq.ramdajs.com" referrerpolicy="origin"></head>
+
+<body class="amp-mode-mouse" style="opacity: 1; visibility: visible; animation: auto ease 0s 1 normal none running none;" bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWllZ29tY29uIiwiYWRibG9ja2VyU3RhdHVzIjp7IkRJU1BMQVkiOiJkaXNhYmxlZCIsIkZBQ0VCT09LIjoiZGlzYWJsZWQiLCJUV0lUVEVSIjoiZGlzYWJsZWQiLCJSRURESVQiOiJkaXNhYmxlZCIsIlBJTlRFUkVTVCI6ImRpc2FibGVkIn0sInZlcnNpb24iOiIxLjkuMTIiLCJzY29yZSI6MTA5MTJ9XQ==">
+  
+  <a href="https://bioku.link/KplRE" target="_blank" rel="noopener nofollow">
+    <span class="bb vb b c blink"><i class="rd ud qc"></i>ALTERNATIF</span>
+  </a>
+  
+  <div class="k jc" bis_skin_checked="1">
+    <!---->
+  </div>
+  <div id="c" data-ride="carousel" class="jb kb" bis_skin_checked="1">
+    <div class="lb" bis_skin_checked="1">
+      <div class="mb nf" bis_skin_checked="1"></div>
+      <!---->
+      <div class="mb nb" bis_skin_checked="1">
+        <amp-img alt="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1" class="vb hc amp-wp-enforced-sizes i-amphtml-element i-amphtml-layout-intrinsic i-amphtml-layout-size-defined i-amphtml-built i-amphtml-layout" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" width="1280" height="720" layout="intrinsic" i-amphtml-layout="intrinsic" style="--loader-delay-offset: 11ms !important;">
+          <i-amphtml-sizer class="i-amphtml-sizer" slot="i-amphtml-svc"><img alt="" role="presentation" aria-hidden="true" class="i-amphtml-intrinsic-sizer" src="data:image/svg+xml;charset=utf-8,<svg height=&quot;720px&quot; width=&quot;1280px&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot; version=&quot;1.1&quot;/>"></i-amphtml-sizer>
+          <noscript><img alt="situs judi slot online gacor terpercaya" class="vb hc" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" width="1280" height="720"/></noscript>
+        <img decoding="async" alt="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" class="i-amphtml-fill-content i-amphtml-replaced-content"><img decoding="async" alt="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" class="i-amphtml-fill-content i-amphtml-replaced-content"><img decoding="async" alt="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" class="i-amphtml-fill-content i-amphtml-replaced-content"><img decoding="async" alt="ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1" src="https://i.postimg.cc/vBdB2Ggy/slot-gacor-hari-ini.jpg" class="i-amphtml-fill-content i-amphtml-replaced-content"></amp-img>
+      </div>
+      <!---->
+      <div class="mb nf" bis_skin_checked="1"></div>
+      <!---->
+    </div>
+  </div>
+  <hr class="af kc rc">
+  <h2 style="text-align: center;">ZEUSQQ SITUS SLOT ONLINE TERPERCAYA</h2>
+  <div class="k l" bis_skin_checked="1">
+    <div class="m" bis_skin_checked="1">
+      <a href="https://bioku.link/KplRE" target="_blank" rel="noopener nofollow" class="p r bf s ub"><i class="rd xd qc"></i>MASUK</a>
+    </div>
+    <div class="m" bis_skin_checked="1">
+      <a href="https://bioku.link/KplRE" target="_blank" rel="noopener nofollow" class="p r cf s ub"><i class="rd ae qc"></i>DAFTAR</a>
+    </div>
+  </div>
+  <div class="k l jd ye g yc" bis_skin_checked="1">
+    <div class="m zc" bis_skin_checked="1">
+      <a href="https://alternatif-zeusqq.ramdajs.com" title="Sports" class="id wb xb ue pd"><i class="qd td fe nc"></i>SPORTS</a>
+    </div>
+    <div class="m zc" bis_skin_checked="1">
+      <a href="https://alternatif-zeusqq.ramdajs.com" title="Casino" class="id wb xb ue pd"><i class="qd td ce nc"></i>CASINO</a>
+    </div>
+    <div class="m zc" bis_skin_checked="1">
+      <a href="https://alternatif-zeusqq.ramdajs.com" title="Slot" class="id wb xb ue pd"><i class="qd td ee nc"></i>SLOT</a>
+    </div>
+    <div class="m zc" bis_skin_checked="1">
+      <a href="https://alternatif-zeusqq.ramdajs.com" title="Togel" class="id wb xb ue pd"><i class="qd td de nc"></i>TOGEL</a>
+    </div>
+    <div class="m zc" bis_skin_checked="1">
+      <a href="https://alternatif-zeusqq.ramdajs.com" title="Games" class="id wb xb ue pd"><i class="qd td be nc"></i>GAMES</a>
+    </div>
+  </div>
+  <hr class="af kc rc">
+  <div id="d" class="sc bd" bis_skin_checked="1">
+    <div class="cc bd" bis_skin_checked="1">
+      <!--
+                    <p class="e ve jd jc">PROGRESSIVE JACKPOT</p>
+                    <div class="fb ie rb af ac tb bc oc">
+                        <div class="je d jd jc">
+                            <div class="tb jc"><span id="e">69.123.321,69</span></div>
+                        </div>
+                        <div class="dc wb zb ac me ne">
+                            <span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span>
+                            <span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span>
+                            <span class="ke"></span>
+                        </div>
+                        <div class="dc wb xb yb ac pe re"><span class="le"></span></div>
+                        <div class="dc wb zb ac me oe">
+                            <span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span>
+                            <span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span><span class="ke"></span><span class="le"></span>
+                            <span class="ke"></span>
+                        </div>
+                        <div class="dc wb xb yb ac pe qe"><span class="le"></span></div>
+                    </div>
+                    <br />
+                    -->
+      <div class="dd" bis_skin_checked="1">
+        <h1 style="text-align: center;"><strong>ZEUSQQ: Slot Demo Zeus Pragmatic Olympus X500 Paling Gacor No.1</strong></h1>
+        <p><a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> Menjadi kondang belakangan ini bersama dengan banyak nya pilihan game yang beragam dan paling baru dengan fitur dan desain yang menarik supaya banyak sahabat slot online yang tadinya bermain bersama mesin slot saat ini beralih pada ZEUSQQ online.</p>
+        <p>Kemudahan dalam bermain <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> yang selagi ini cuma bersama dengan menggunakan sebuah handphone. Hal ini yang sebabkan teman akrab slot online menjadi lebih enteng dalam jalankan permainan ZEUSQQ dengan enjoy dikala lelah melakukan aktifitas seharian.</p>
+        <p>Saat ini game slot yang lagi terkenal berasal berasal dari provider ternama Pragmatic Play dengan game slot nya Gates Olympus. Game slot yang satu ini sering disebut oleh teman akrab slot online yang ada di Indonesia bersama nama ZEUSQQ. Game ZEUSQQ ini membawa banyak keunggulan saat dimainkan. Pada artikel ini kita bakal membahas keistimewaan dari ZEUSQQ ini.</p>
+        <h2>ZEUSQQ Anti Rungkad Di Tahun 2023</h2>
+        <p>Provider Pragmatic Play tidak asal-asalan didalam mengeluarkan product game <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> nya. game yang populer dari provider ini merupakan game ZEUSQQ yang banyak memberi keuntungan seperti bonus scatter gratis, dan juga bonus perkalian yang besar.</p>
+        <p>Game ZEUSQQ ini termasuk sanggup teman akrab slot online mainkan terhadap situs slot server luar negeri yang beroperasi di Indonesia. dengan manfaatkan web slot server luar negeri yang tersedia di Indonesia, kawan baik slot online tak kudu cemas untuk melaksanakan deposit bersama Bank lokal yang tersedia di Indonesia untuk bermain game ZEUSQQ.</p>
+        <p>ZEUSQQ ini lah yang menjadi awal mula ramainya peminat game slot online yang tersedia di Indoensia. <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> menyebabkan teman baik slot online ramai memainkan game dari provider ternama ini, bersama dengan banyak beroleh kemenangan yang amat tinggi.</p>
+        <p>Slot anti rungkad merupakan arti yang di ambil dalam bhs Indonesia, Kata rungkad sendiri diambil alih berasal dari bahasa daerah bandung yang membawa makna kalah. Slot anti rungkad jadi fenomenal, sebab ZEUSQQ ini banyak beri tambahan kemenangan kepada tiap-tiap pemain.</p>
+        <h2>Daftar Game ZEUSQQ Anti Rungkad dari Pragmatic Play</h2>
+        <p>Provider pragmatic tidak cuma berikan satu kelebihan pada game slotnya. tak sekedar game ZEUSQQ ini kawan baik slot online termasuk bisa memliih game slot lain dari provider ini sebagai pilihan lain dan yang pasti game slot dari provider ini umumnya mempunyai rating sebagai game slot anti rungkad seperti game ZEUSQQ.</p>
+        <p>Dalam artikel ini, admin telah rangkum beberapa game berasal dari provider pragmatic play ini yang membawa rtp tinggi dan sudah pasti kawan akrab slot gacor bakal anti rungkad saaat memainkan nya. selanjutnya daftar dari game slot anti rungkad dari provider pragmatic play ini :</p>
+        <ol>
+          <li>ZEUSQQ 888 Dragons</li>
+          <p>888 Dragons adalah slot online klasik bersama 3 gulungan yang menampilkan tema Oriental yang sederhana. Game ini mempunyai RTP sebesar 96,84%, yang lumayan tinggi untuk slot bersama dengan format yang lebih sederhana.</p>
+          <li>ZEUSQQ Hoki The Dog House</li>
+          <p>The Dog House adalah slot bersama tema anjing yang menggemaskan. Dalam permainan ini, pemain dapat menikmati 5 gulungan dan 20 payline, serta fitur-fitur menarik seperti putaran gratis bersama pengganda kemenangan dan simbol liar yang bisa mengunci gulungan.</p>
+          <li>ZEUSQQ Wolf Gold</li>
+          <p>Wolf Gold adalah slot online yang terlampau populer bersama tema serigala dan lanskap Amerika yang indah. Game ini tawarkan 5 gulungan, 25 payline, dan RTP sebesar 96,01%. Selain itu, Wolf Gold terhitung punya fitur-fitur menarik seperti putaran gratis dan jackpot progresif.</p>
+          <li>ZEUSQQ Mustang Gold</li>
+          <p>Mustang Gold adalah slot online bertema Barat bersama dengan 5 gulungan dan 25 payline. Game ini menawarkan RTP sebesar 96,53% dan fitur-fitur menarik layaknya putaran gratis bersama simbol liar yang sanggup mengunci gulungan, serta fitur Money Collect yang bisa menambahkan hadiah besar.</p>
+          <li>Slot Zues John Hunter plus the Book of Tut</li>
+          <p>John Hunter and the Book of Tut adalah slot online petualangan bersama dengan tema penjelajahan dan kekayaan Mesir. Slot ini menampilkan 5 gulungan, 10 payline, dan RTP sebesar 96,50%. Fitur putaran gratis bersama simbol ekspansi tingkatkan kesempatan untuk memenangkan hadiah besar.</p>
+          <li>ZEUSQQ John Hunter plus the Tomb of the Scarab Queen</li>
+          <p>John Hunter plus the Tomb of the Scarab Queen adalah petualangan seru yang mengajak pemain untuk mendapatkan harta karun di dalam makam Firaun. Slot ini menampilkan 5 gulungan, 25 payline, dan fitur-fitur menarik seperti putaran gratis, pengganda kemenangan, dan fitur Money Collect.</p>
+          <li>ZEUSQQ Great Rhino Megaways</li>
+          <p>Great Rhino Megaways adalah slot online bersama format Megaways yang populer, di mana tiap-tiap putaran mampu membuahkan hingga 200.704 langkah untuk menang. Game ini memiliki RTP sebesar 96,47% dan menawarkan fitur-fitur menarik seperti putaran gratis bersama pengganda makin tambah dan simbol liar.</p>
+          <li>ZEUSQQ Hoki Chilli Heat</li>
+          <p>Chilli Heat adalah slot bertema Meksiko yang penuh warna. Slot ini menampilkan 5 gulungan dan 25 payline, dan juga fitur-fitur menarik seperti putaran gratis dengan simbol spesifik yang muncul lebih kerap dan jackpot progresif.</p>
+          <li>ZEUSQQ Sweet Bonanza</li>
+          <p>Sweet Bonanza adalah slot online gula-gula yang manis bersama dengan 6 gulungan dan format pembayaran Cluster Pays. Game ini memiliki RTP sebesar 96,51% dan fitur-fitur menarik seperti tumbling reels, pengganda kemenangan, dan putaran gratis.</p>
+        </ol>
+        <h2>ZEUSQQ Anti Rungkad Di Situs Resmi Dan Terpercaya</h2>
+        <p>Sudah Di pastikan ZEUSQQ merupakan sumber cuan bagi kawan dekat slot online, tak sekedar bonus scatter gratis yang didapat sahabat slot termasuk dapat promosi dan bonus bersama dengan mendaftar terhadap situs slot online yang asli.</p>
+            <p>Maksud berasal dari <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> yang asli adalah, website slot yang formal dan terpercaya yang pasti membayarkan pemain nya kala beroleh kemenangan sementara bermain game slot. slot anti rungkad akan percuma terkecuali kawan akrab slot online beroleh kemenangan namun tidak dibayarkan oleh pemilik situs.</p>
+        <p><a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> yang anti rungkad sebenarnya susah-susah ringan untuk di temukan, biarpun slot kakek dewa zeus berikan kemenangan yang tinggi dan bila sahabat slot salah menentukan web site kala bermain, tentu saja sobat slot online tidak dapat mendapatkan keuntungan.</p>
+        <p>Dengan banyak Keunggulan berasal dari ZEUSQQ ini. Membuat provider pragmatic play banyak mendapat penghargaan sebagai provider terbaik didalam perjudian online sementara ini. Tentu saja tak hanya game ZEUSQQ andalan nya. Provider Pragmatic Play termasuk banyak miliki game favorit lainnya dan pasti nya ngak kalah hebat bersama game ZEUSQQ ini.</p>
+        <h2>Slot Server Luar Negeri Anti Rungkad bersama ZEUSQQ Hari Ini</h2>
+        <p><a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a>, khususnya yang beroperasi di kawasan Indonesia pasti sahabat slot online senantiasa menemukan ikon dari ZEUSQQ yang satu ini. Sebab ZEUSQQ yang satu ini bisa di anggap sebagai pembawa hoki membuat slot server luar negeri.</p>
+        <p><a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> yang hoki ya tentunya pembawa keberuntungan buat sahabat slot online, bersama mudah maxwin dan banyak bonus baik dari dalam game slot itu sendiri ataupun dari slot server luar negeri yang termasuk memberi tambahan banyak promo dan bonus kepada tiap-tiap member yang berhimpun di situsnya.</p>
+        <p>Slot server luar negeri banyak memberi tambahan promosi layaknya promo member baru, dan tentu nya juga tersedia bonus harian, mingguan dan juga bulanan, tapi tidak seluruh slot server luar negeri tawarkan fitur tersebut. menjadi sahabat slot online dapat pilih mana web site slot luar negeri yang bisa untungkan kawan akrab slot.</p>
+        <p>Dalam perihal ini, kawan akrab slot online tak salah sementara datang ke web ZEUSQQ ini, dikarenakan kami merupakan keliru satu slot server luar negeri yang formal dan terpercaya selalu membayar kemenangan player disaat mendapat kemenangan. Situs slot server luar negeri kami juga memberikan promo dan bonus yang mampu teman baik slot online temukan di menu Info promo dan bonus terhadap web site kami. dan pasti nya game ZEUSQQ ini termasuk sanggup teman akrab slot online mainkan terhadap web kami.</p>
+        <h2>Demo Slot Gates Of Olympus ZEUSQQ Anti Rungkad</h2>
+        <p>Bagi kawan dekat slot online yang baru belajar atau coba permainan game ZEUSQQ. biasanya melacak fitur demo sebelum saat memainkan game ZEUSQQ bersama gunakan duit asli. Provider pragmatic play menyimak perihal ini dan menjadikannya sebagai inovasi di dalam tetap mengembangkan perusahaannya sehingga selalu menjadi yang paling baik di Asia.</p>
+        <p>Fitur demo ZEUSQQ ini mampu kawan baik slot online temukan terhadap web slot luar negeri yang resmi, kala kalian coba demo ZEUSQQ yang satu ini, jangan cemas untuk was-was kalah, sebab fitur demo tidak manfaatkan duwit asli sebagai taruhannya, melainkan sahabat slot online mendapatkan kredit yang di sajikan dan mampu langsung memainkannya.</p>
+        <p>Fitur demo membawa dampak sahabat slot online bakal merasakan bermain slot anti rungkad tanpa kekalahan, mudah maxwin dan jackpot besar. bersama pengalaman bermain demo ZEUSQQ, teman baik slot dijamin bakal merasakan bermain slot anti rungkad dikala sudah berlatih menggunakan slot demo ini.</p>
+        <h2>Daftar Situs ZEUSQQ Resmi Situs Slot Anti Rungkad Resmi Dan Terpercaya</h2>
+        <p>Untuk mendaftar terhadap web site slot online gacor resmi, kalian hanya lumayan melakukan pendaftaran yang bisa di temukan terhadap halaman situs ini. Berikut tata langkah mendaftar terhadap web site ZEUSQQ gacor resmi kami:</p>
+        <br>
+        <table class="LinkSlotGacor" style="width:100%">
+          <thead>
+            <tr>
+              <th colspan="3">Klik Menu Daftar Pada Halaman Situs ZEUSQQ Terbaru 2023</th>
+            </tr>
+            <tr>
+              <th colspan="3">-KLIK MENU DAFTAR-</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Username:</td>
+              <td>ZEUSQQ</td>
+            </tr>
+            <tr>
+              <td>Password</td>
+              <td>slotgacorterbaru</td>
+            </tr>
+            <tr>
+              <td>Konfirmasi Password</td>
+              <td>slotgacorterbaru</td>
+            </tr>
+            <tr>
+              <td>Email</td>
+              <td>Isi bersama dengan email kawan baik <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a></td>
+            </tr>
+            <tr>
+              <td>No. Telp / No. HP</td>
+              <td>Masukan nomor telephone / HP kawan dekat slot Gacor </td>
+            </tr>
+            <tr>
+              <td>Refferal</td>
+              <td>Akun Gacor</td>
+            </tr>
+            <tr>
+              <td>Silahkan Pilih Bank</td>
+              <td>Pilih Metode Pembayaran</td>
+            </tr>
+            <tr>
+              <td>Nama Pemilik Rekening</td>
+              <td>Isi nama teman baik Slot Gacor</td>
+            </tr>
+            <tr>
+              <td>Nomor Rekening Bank / E-Wallet</td>
+              <td>Isi bersama nomor rekening bank / E-Wallet sahabat Slot Gacor</td>
+            </tr>
+          </tbody>
+        </table>
+        <br>
+        <h2>Kesimpulan</h2>
+        <p>ZEUSQQ merupakan game slo online asli bersama web site slot anti rungkad yang resmi dan terpercaya di Indonesia. <a href="https://alternatif-zeusqq.ramdajs.com">ZEUSQQ</a> yang punyai koleksi game slot online terlengkap dan termasuk mempunyai fitur demo yang dapat kalian memanfaatkan sebelum akan bermain game slot online bersama dengan duwit asli</p>
+        <br>
+        <h3 class="title">FAQ - Pertanyaan Umum Mengenai ZEUSQQ</h3>
+        <br>
+
+        <h4 class="faq">Apa itu Slot Online ZEUSQQ?</h4>
+        <p>ZEUSQQ merupakan game slot online yang saat ini ini sanggup di nikmati bersama dengan hanya memakai smartphone, dan ZEUSQQ merupakan sebuah game slot online yang kondang sementara ini.</p>
+
+        <h4 class="faq">Bagaimana cara Daftar di slot online ZEUSQQ?</h4>
+        <p>Cara daftar ZEUSQQ, cukup dengan ikuti link yang diarahkan pada website ini, dan kawan baik slot online mampu menemukan situs resmi kami yang aman dan terpercaya.</p>
+
+        <h4 class="faq">Apa yang membedakan ZEUSQQ dari slot lainnya?</h4>
+        <p>ZEUSQQ menawarkan tema yang unik bersama dengan simbol-simbol yang mengenai bersama mitologi Yunani. Fitur bonus yang menarik dan animasi yang menakjubkan membawa dampak permainan ini lebih menarik dan menghibur.</p>
+      </div>
+      <!---->
+
+      <!---->
+      <div tabindex="-1" role="dialog" id="f" class="nf a kf" bis_skin_checked="1"></div>
+      <div tabindex="-1" role="dialog" id="g" class="nf a kf" bis_skin_checked="1"></div>
+      <!--
+                    <nav class="y db fc se vc">
+                        <ul class="ab w hc">
+                            <li class="x">
+                                <a href="https://bioku.link/KplRE" class="v g id wb xb"><i class="rd sd wd nc"></i>Beranda </a>
+                            </li>
+                            <li class="x">
+                                <a href="https://bioku.link/KplRE" target="_blank" class="v g id wb xb"><i class="rd sd ae nc"></i>Daftar </a>
+                            </li>
+                            <li class="x">
+                                <a href="https://bioku.link/KplRE" target="_blank" class="v g id wb xb"><i class="rd sd zd nc"></i>Masuk </a>
+                            </li>
+                            <li class="x">
+                                <a href="https://bioku.link/KplRE" target="_blank" class="v g id wb xb we"><i class="qd sd ge nc"></i>Promo </a>
+                            </li>
+                            <li class="x t">
+                                <a href="https://bioku.link/KplRE" target="_blank" class="v g id wb xb xe u"><i class="rd sd vd nc"></i>Livechat </a>
+                                <div class="hc nf"></div>
+                            </li>
+                        </ul>
+                    </nav>
+                    -->
+      <div tabindex="-1" role="dialog" id="h" class="nf a lf" bis_skin_checked="1"></div>
+      <div tabindex="-1" role="dialog" id="i" class="nf a kf" bis_skin_checked="1"></div>
+      <div id="j" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true" class="nf a" bis_skin_checked="1"></div>
+    </div>
+    <!---->
+    <hr class="af kc rc">
+    <footer class="dd">
+      <div class="jd" style="color: #fff;" bis_skin_checked="1">MR.Z. © ZEUSQQ x Slot Demo 2023.</div>
+    </footer>
+  </div>
+  
+
+
+
+
+</body></html>
